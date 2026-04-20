@@ -14,8 +14,6 @@ provider:
 functions:
   api:
     handler: app.main.handler
-    layers:
-      - arn:aws:lambda:${aws:region}:764866452798:layer:poppler:1
     events:
       - http:
           path: /
