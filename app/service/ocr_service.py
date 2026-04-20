@@ -6,7 +6,15 @@ import numpy as np
 import logging
 
 
-ocr_engine = PaddleOCR(use_angle_cls=True, lang='en')
+ocr_engine = PaddleOCR(
+    use_angle_cls=True, 
+    lang='en',
+    use_gpu=False,
+    det_model_dir='/tmp/.paddleocr/det',
+    rec_model_dir='/tmp/.paddleocr/rec',
+    cls_model_dir='/tmp/.paddleocr/cls'
+)
+
 
 def extract_text_from_memory_image(img_array: np.ndarray) -> list[str]:
    

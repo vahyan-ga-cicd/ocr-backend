@@ -14,6 +14,8 @@ provider:
 functions:
   api:
     handler: app.main.handler
+    layers:
+      - arn:aws:lambda:${aws:region}:764866452798:layer:poppler:1
     events:
       - http:
           path: /
@@ -29,9 +31,11 @@ plugins:
 
 custom:
   pythonRequirements:
-    dockerizePip: true # Essential for paddleocr/opencv binaries
-    layer: true # Recommended for faster deployments and keeping package small
-    slim: true # Strips unnecessary files
+    dockerizePip: false # Disabled to avoid build errors and keep it pure Python
+    zip: true # Zip dependencies to save space
+    slim: true # Strips unnecessary files (test, doc, __pycache__)
     noDeploy:
       - boto3
       - botocore
+      - setuptools
+      - pip
