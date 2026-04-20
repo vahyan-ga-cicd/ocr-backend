@@ -1,12 +1,10 @@
-fastapi
-uvicorn
-python-multipart # Parses uploaded files
-pillow # Image processing library
-numpy
-
-
-opencv-python-headless
-pymupdf
+fastapi==0.115.0
+uvicorn==0.30.6
+python-multipart==0.0.9
+pillow==10.4.0
+numpy<2.0.0
+opencv-python-headless==4.10.0.84
+pymupdf==1.24.11
 paddleocr==2.7.3
 paddlepaddle==2.6.2
-mangum
+mangum==0.17.0
