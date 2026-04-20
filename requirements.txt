@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-multipart # Parses uploaded files
+pillow # Image processing library
+numpy<2.0.0
+opencv-python
+pdf2image 
+paddleocr==2.7.3
+paddlepaddle==2.6.2
