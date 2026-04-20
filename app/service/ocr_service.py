@@ -6,14 +6,25 @@ import numpy as np
 import logging
 
 
-ocr_engine = PaddleOCR(
-    use_angle_cls=True, 
-    lang='en',
-    use_gpu=False,
-    det_model_dir='/tmp/.paddleocr/det',
-    rec_model_dir='/tmp/.paddleocr/rec',
-    cls_model_dir='/tmp/.paddleocr/cls'
-)
+import threading
+
+_ocr_engine = None
+_ocr_lock = threading.Lock()
+
+def get_ocr_engine():
+    global _ocr_engine
+    if _ocr_engine is None:
+        with _ocr_lock:
+            if _ocr_engine is None:
+                _ocr_engine = PaddleOCR(
+                    use_angle_cls=True, 
+                    lang='en',
+                    use_gpu=False,
+                    det_model_dir='/tmp/.paddleocr/det',
+                    rec_model_dir='/tmp/.paddleocr/rec',
+                    cls_model_dir='/tmp/.paddleocr/cls'
+                )
+    return _ocr_engine
 
 
 def extract_text_from_memory_image(img_array: np.ndarray) -> list[str]:
@@ -26,7 +37,7 @@ def extract_text_from_memory_image(img_array: np.ndarray) -> list[str]:
         logging.info(f"Processing image with shape: {img_array.shape}")
         
         
-        result = ocr_engine.ocr(img_array)
+        result = get_ocr_engine().ocr(img_array)
         
         extracted_lines = []
         if result and len(result) > 0 and result[0] is not None:
