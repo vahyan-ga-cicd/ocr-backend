@@ -1,0 +1,37 @@
+service: ocr-backend
+
+provider:
+  name: aws
+  runtime: python3.9
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  memorySize: 2048 # High memory for OCR tasks
+  timeout: 30 # Processing documents can take time
+  environment:
+    # Add any environment variables here
+    # PADDLE_ONEDNN_OPTERS: "0"
+
+functions:
+  api:
+    handler: app.main.handler
+    events:
+      - http:
+          path: /
+          method: any
+          cors: true
+      - http:
+          path: /{proxy+}
+          method: any
+          cors: true
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: true # Essential for paddleocr/opencv binaries
+    layer: true # Recommended for faster deployments and keeping package small
+    slim: true # Strips unnecessary files
+    noDeploy:
+      - boto3
+      - botocore

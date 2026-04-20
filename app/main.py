@@ -6,6 +6,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.routes import documents
+from mangum import Mangum
+
 
 app = FastAPI(
     title="OCR Reading API",
@@ -24,6 +26,9 @@ app.add_middleware(
 
 
 app.include_router(documents.router, prefix="/api/v1", tags=["Documents"])
+
+handler = Mangum(app)
+
 
 @app.get("/")
 async def root():
