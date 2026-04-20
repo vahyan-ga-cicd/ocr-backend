@@ -2,7 +2,7 @@ fastapi
 uvicorn
 python-multipart # Parses uploaded files
 pillow # Image processing library
-numpy<2.0.0
+numpy
 
 
 opencv-python-headless

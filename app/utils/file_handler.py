@@ -17,15 +17,11 @@ def get_images_from_upload(upload_file: UploadFile) -> list:
     
     try:
         if is_pdf:
-            try:
-                # Convert PDF to images using pdf2image
-                pil_images = convert_from_bytes(file_bytes)
-                for img in pil_images:
-                    # Convert PIL images to NumPy arrays for PaddleOCR
-                    images.append(np.array(img))
-            except Exception as e:
-                print(f"PDF processing failed (likely missing Poppler): {e}")
-                raise Exception("PDF processing is currently unavailable on this environment. Please upload images (.jpg, .png) instead.")
+            # Convert PDF to images using pdf2image
+            pil_images = convert_from_bytes(file_bytes)
+            for img in pil_images:
+                # Convert PIL images to NumPy arrays for PaddleOCR
+                images.append(np.array(img))
         else:
             # --- OPEN CV LOGIC ---
             # 1. Convert bytes to a 1D numpy array
