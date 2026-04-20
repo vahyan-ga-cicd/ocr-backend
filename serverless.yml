@@ -3,9 +3,9 @@ service: ocr-backend
 provider:
   name: aws
   runtime: python3.9 # Still used as a reference
-  stage: prod
+  stage: $default
   region: ap-south-1
-  memorySize: 2048
+  memorySize: 3008
   timeout: 60
   ecr:
     # This tells Serverless to build the image from the local Dockerfile
@@ -19,15 +19,9 @@ functions:
       command:
         - app.main.handler
       name: appimage
+    timeout: 300
     events:
-      - http:
-          path: /
-          method: any
-          cors: true
-      - http:
-          path: /{proxy+}
-          method: any
-          cors: true
+      - httpApi: '*'
 
 # No plugins needed for Docker-based deployment
 # No custom pythonRequirements needed
