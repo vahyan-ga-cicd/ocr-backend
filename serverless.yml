@@ -2,18 +2,23 @@ service: ocr-backend
 
 provider:
   name: aws
-  runtime: python3.9
+  runtime: python3.9 # Still used as a reference
   stage: prod
   region: ap-south-1
-  memorySize: 2048 # High memory for OCR tasks
-  timeout: 30 # Processing documents can take time
-  environment:
-    # Add any environment variables here
-    # PADDLE_ONEDNN_OPTERS: "0"
+  memorySize: 2048
+  timeout: 30
+  ecr:
+    # This tells Serverless to build the image from the local Dockerfile
+    images:
+      appimage:
+        path: ./
 
 functions:
   api:
-    handler: app.main.handler
+    image:
+      command:
+        - app.main.handler
+      name: appimage
     events:
       - http:
           path: /
@@ -24,16 +29,5 @@ functions:
           method: any
           cors: true
 
-plugins:
-  - serverless-python-requirements
-
-custom:
-  pythonRequirements:
-    dockerizePip: false # Disabled to avoid build errors and keep it pure Python
-    zip: true # Zip dependencies to save space
-    slim: true # Strips unnecessary files (test, doc, __pycache__)
-    noDeploy:
-      - boto3
-      - botocore
-      - setuptools
-      - pip
+# No plugins needed for Docker-based deployment
+# No custom pythonRequirements needed

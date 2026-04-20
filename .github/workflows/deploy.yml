@@ -32,9 +32,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Install Plugins
-        run: sls plugin install -n serverless-python-requirements
-
       - name: Deploy with Serverless
         run: sls deploy --stage prod
         env:
