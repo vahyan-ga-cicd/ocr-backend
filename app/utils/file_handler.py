@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
+import fitz  # PyMuPDF
 from fastapi import UploadFile
-from pdf2image import convert_from_bytes
 
 
 def get_images_from_upload(upload_file: UploadFile) -> list:
@@ -17,11 +17,15 @@ def get_images_from_upload(upload_file: UploadFile) -> list:
     
     try:
         if is_pdf:
-            # Convert PDF to images using pdf2image
-            pil_images = convert_from_bytes(file_bytes)
-            for img in pil_images:
-                # Convert PIL images to NumPy arrays for PaddleOCR
-                images.append(np.array(img))
+            # Convert PDF to images using PyMuPDF (fitz)
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            for page in doc:
+                pix = page.get_pixmap()
+                # Convert pixmap to numpy array (RGB)
+                img_data = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
+                # PaddleOCR works with RGB, so we can append directly
+                images.append(img_data)
+            doc.close()
         else:
             # --- OPEN CV LOGIC ---
             # 1. Convert bytes to a 1D numpy array
