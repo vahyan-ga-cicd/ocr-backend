@@ -2,14 +2,20 @@
 FROM public.ecr.aws/lambda/python:3.9
 
 # Install system dependencies for PaddleOCR and OpenCV
-# we need mesa-libGL, libX11, and libgomp
+# we need mesa-libGL, libX11, libgomp, and BUILD TOOLS (gcc) for pymupdf
 RUN yum install -y \
     mesa-libGL \
     libX11 \
     libXext \
     libXrender \
     libgomp \
+    gcc \
+    gcc-c++ \
+    make \
     && yum clean all
+
+# Upgrade pip and build tools to ensure we find wheels
+RUN pip install --upgrade pip setuptools wheel
 
 # Copy requirements file
 COPY requirements.txt .
