@@ -46,17 +46,15 @@ async def process_documents(request: Request):
     try:
         form_data = await request.form()
         
-        # Create tasks for all valid file uploads
-        tasks = []
+        # Process documents sequentially to manage memory
+        final_results = []
         for label, value in form_data.items():
             if hasattr(value, "filename") and value.filename:
-                tasks.append(process_single_file(label, value))
-        
-        if not tasks:
-            return {"total_documents": 0, "documents": [], "message": "No files uploaded"}
+                result = await process_single_file(label, value)
+                final_results.append(result)
 
-        # Run all document processing tasks in parallel
-        final_results = await asyncio.gather(*tasks)
+        if not final_results:
+            return {"total_documents": 0, "documents": [], "message": "No files uploaded"}
 
         return {
             "total_documents": len(final_results),
