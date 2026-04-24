@@ -1,0 +1,12 @@
+venv/
+.git/
+.gitignore
+.github/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.db
+.DS_Store
+node_modules/
+.serverless/
