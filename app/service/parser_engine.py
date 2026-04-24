@@ -173,7 +173,7 @@ def _extract_bank_details(text_lines: list[str], result: dict):
     # 5th char is '0', but OCR misreads it as O, D, Q, U, C, etc.
     ifsc_pattern = r'([A-Z]{4}[0ODQUC][A-Z0-9]{6})'
     
-    # Try looking for keyword first in no-space text, allowing some noise
+   
     ifsc_match = re.search(r'(?:IFSC|IFSCODE|IFS|CODE|IFSCODE).{0,15}?' + ifsc_pattern, full_text_no_space)
     if ifsc_match:
         val = ifsc_match.group(1)
