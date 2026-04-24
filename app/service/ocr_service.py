@@ -25,7 +25,10 @@ def get_ocr_engine():
                     use_angle_cls=True, 
                     lang='en',
                     use_gpu=False,
-                    use_onnx=False, # Reverting to False but using 4GB RAM for stability
+                    use_onnx=False,
+                    det_model_dir='/opt/paddle_models/det/en/en_PP-OCRv3_det_infer',
+                    rec_model_dir='/opt/paddle_models/rec/en/en_PP-OCRv4_rec_infer',
+                    cls_model_dir='/opt/paddle_models/cls/ch_ppocr_mobile_v2.0_cls_infer',
                     det_limit_side_len=800,
                     det_limit_type='max',
                     cpu_threads=2,
