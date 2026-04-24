@@ -26,7 +26,7 @@ def get_ocr_engine():
                     lang='en',
                     use_gpu=False,
                     use_onnx=False, # Reverting to False but using 4GB RAM for stability
-                    det_limit_side_len=960,
+                    det_limit_side_len=800,
                     det_limit_type='max',
                     cpu_threads=2,
                     show_log=False
