@@ -32,14 +32,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Debug - List Files
-        run: |
-          ls -R
-          pwd
-          df -h
-
       - name: Deploy with Serverless
-        run: sls deploy --stage dev --verbose
+        run: sls deploy --stage dev
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
-          SLS_DEBUG: "*"
