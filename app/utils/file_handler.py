@@ -4,7 +4,7 @@ import fitz  # PyMuPDF
 from fastapi import UploadFile
 
 
-def _resize_image_to_target(img: np.ndarray, max_dim: int = 1300) -> np.ndarray:
+def _resize_image_to_target(img: np.ndarray, max_dim: int = 960) -> np.ndarray:
     """Helper to resize image while maintaining aspect ratio if it exceeds max_dim."""
     h, w = img.shape[:2]
     if max(h, w) > max_dim:
@@ -27,9 +27,9 @@ def get_images_from_upload(upload_file: UploadFile) -> list:
     
     try:
         if is_pdf:
-            # Convert PDF to images using PyMuPDF (fitz) at 130 DPI (Optimized for Lambda)
+            # Convert PDF to images using PyMuPDF (fitz) at 100 DPI (Aggressive optimization for memory)
             doc = fitz.open(stream=file_bytes, filetype="pdf")
-            matrix = fitz.Matrix(130 / 72, 130 / 72)
+            matrix = fitz.Matrix(100 / 72, 100 / 72)
             
             for page in doc:
                 pix = page.get_pixmap(matrix=matrix)

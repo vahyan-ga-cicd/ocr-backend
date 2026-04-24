@@ -21,9 +21,9 @@ def get_ocr_engine():
                     det_model_dir='/tmp/.paddleocr/det',
                     rec_model_dir='/tmp/.paddleocr/rec',
                     cls_model_dir='/tmp/.paddleocr/cls',
-                    det_limit_side_len=1300,
+                    det_limit_side_len=960, # Standard size, uses significantly less RAM than 1300/1500
                     det_limit_type='max',
-                    cpu_threads=2 # Limit threads to reduce memory overhead in Lambda
+                    cpu_threads=2 # Keep threads low to prevent memory overhead
                 )
     return _ocr_engine
 
@@ -33,7 +33,7 @@ def extract_text_from_memory_image(img_array: np.ndarray) -> list[str]:
         if img_array.dtype != np.uint8:
             img_array = img_array.astype(np.uint8)
 
-        # (Resizing is already handled in file_handler.py to target 1300px)
+        # (Resizing is already handled in file_handler.py to target 960px)
 
         # PaddleOCR .ocr() call (Wrapped in lock as it's typically not thread-safe)
         with _ocr_execution_lock:
