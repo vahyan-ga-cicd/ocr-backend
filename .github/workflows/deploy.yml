@@ -36,9 +36,10 @@ jobs:
         run: |
           ls -R
           pwd
+          df -h
 
       - name: Deploy with Serverless
-        run: sls deploy --stage prod --verbose
+        run: sls deploy --stage dev --verbose
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           SLS_DEBUG: "*"
