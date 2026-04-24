@@ -5,25 +5,31 @@ import logging
 import numpy as np
 from paddleocr import PaddleOCR
 
+import os
+
+# Set HOME to /tmp for Lambda to ensure PaddleOCR has a writable directory for models
+if os.environ.get('AWS_LAMBDA_FUNCTION_NAME'):
+    os.environ['HOME'] = '/tmp'
+
 _ocr_engine = None
 _ocr_lock = threading.Lock()
-_ocr_execution_lock = threading.Lock() # Lock for thread-safe OCR calls
+_ocr_execution_lock = threading.Lock()
 
 def get_ocr_engine():
     global _ocr_engine
     if _ocr_engine is None:
         with _ocr_lock:
             if _ocr_engine is None:
+                # Optimized for AWS Lambda (Memory & Latency)
                 _ocr_engine = PaddleOCR(
                     use_angle_cls=True, 
                     lang='en',
                     use_gpu=False,
-                    det_model_dir='/tmp/.paddleocr/det',
-                    rec_model_dir='/tmp/.paddleocr/rec',
-                    cls_model_dir='/tmp/.paddleocr/cls',
-                    det_limit_side_len=960, # Standard size, uses significantly less RAM than 1300/1500
+                    use_onnx=False, # Reverting to False but using 4GB RAM for stability
+                    det_limit_side_len=960,
                     det_limit_type='max',
-                    cpu_threads=2 # Keep threads low to prevent memory overhead
+                    cpu_threads=2,
+                    show_log=False
                 )
     return _ocr_engine
 

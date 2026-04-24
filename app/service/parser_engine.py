@@ -75,7 +75,7 @@ def _detect_document_type(full_text: str) -> str:
 
     # 2. GST / TDS detection
     if any(k in full_text for k in ["GOODS AND SERVICES TAX", "GSTIN", "FORM GST"]): return "GST Document"
-    if any(k in full_text for k in ["TAX DEDUCTED AT SOURCE", "TDS", "NON-DEDUCTION"]): return "TDS/SD Document"
+    if any(k in full_text for k in ["TAX DEDUCTED AT SOURCE", "TDS", "NON-DEDUCTION", "DECLARATION", "194C"]): return "TDS/SD Document"
 
     # 3. RC detection with fuzzy matching support
     if any(k in full_text for k in ["REGISTRATION CERTIFICATE", "REGN.NUMBER", "OWNER NAME", "CHASSIS"]):
@@ -92,7 +92,7 @@ def _detect_document_type(full_text: str) -> str:
             return "Aadhaar Back"
         return "Aadhaar Card"
 
-    # 5. PAN Card
+    # 5. PAN Card (Check this last because PAN numbers appear on many other documents like GST/TDS)
     if any(k in full_text for k in ["INCOME TAX DEPARTMENT", "PERMANENT ACCOUNT NUMBER"]) or re.search(r'[A-Z]{5}[0-9]{4}[A-Z]{1}', full_text):
         return "PAN Card"
     
@@ -227,23 +227,25 @@ def _extract_tax_doc_details(text_lines: list[str], result: dict):
     
     # Try more comprehensive patterns for GST/TDS addresses
     # Pattern 1: Look for "Address of Principal Place of Business" or similar
-    # Added (?:\s*OF\s*BUSINESS)? and ADDRESS\s*OF\s*THE\s*PERSON to keywords
-    gst_addr_pattern = r'(?:ADDRESS\s*OF\s*PRINCIPAL\s*PLACE(?:\s*OF\s*BUSINESS)?|PRINCIPAL\s*PLACE\s*OF\s*BUSINESS|REGISTERED\s*OFFICE\s*ADDRESS|ADDRESS\s*OF\s*THE\s*PERSON)[:\s]*\s*([^.]{10,300}?(?:\d{6}|PIN|INDIA|TAMIL|TN|KERALA|KARNATAKA|MAHARASHTRA|DELHI)[^.]{0,20})'
+    gst_addr_pattern = r'(?:ADDRESS\s*OF\s*PRINCIPAL\s*PLACE(?:\s*OF\s*BUSINESS)?|PRINCIPAL\s*PLACE\s*OF\s*BUSINESS|REGISTERED\s*OFFICE\s*ADDRESS|ADDRESS\s*OF\s*THE\s*PERSON|ADDRESS\s*OF\s*THE\s*DEDUCTOR|DEDUCTOR\s*ADDRESS)[:\s]*\s*([^\n\r]{10,400}?(?:\d{6}|PIN|INDIA|TAMIL|TN|KERALA|KARNATAKA|MAHARASHTRA|DELHI|NAMAKKAL)[^\n\r]{0,20})'
     match = re.search(gst_addr_pattern, full_doc, re.IGNORECASE)
     
     if not match:
-        # Pattern 2: Generic "Address" or "N/O" (sometimes seen in OCR of Care Of)
-        match = re.search(r'(?:N/O|ADDRESS)[:\s]*\s*([^.]{10,250}?(?:\d{6}|PIN|INDIA|TAMIL|TN|NAMAKKAL)[^.]{0,20})', full_doc, re.IGNORECASE)
+        # Pattern 2: Generic "Address" or "N/O" or "LOCATED AT" (Removed [^.] constraint to allow periods in names/titles)
+        match = re.search(r'(?:N/O|ADDRESS|LOCATED\s*AT)[:\s]*\s*([^\n\r]{10,400}?(?:\d{6}|PIN|INDIA|TAMIL|TN|NAMAKKAL)[^\n\r]{0,20})', full_doc, re.IGNORECASE)
 
     if match:
         addr = match.group(1).strip()
         # Filter out common junk at start of address
         addr = re.sub(r'^[I,]\s*[^,]+,\s*[SWDC]/O\s*[^,]+,\s*', '', addr, flags=re.IGNORECASE)
-        # Remove trailing noise like "Date of issue" or "PAN of..."
-        addr = re.sub(r'\s+(?:DATE|PAN|REGISTRATION|PLACE|TIME|NAME|GSTIN|FORM).*$', '', addr, flags=re.IGNORECASE)
-        # Remove multiple spaces
+        # Remove trailing noise like "Date of issue" or "PAN of..." or legal jargon
+        # Using a more aggressive pattern that catches text joined by periods or brackets
+        addr = re.sub(r'[.\s]*\(?HERE\s*IN\s*AFT.*$', '', addr, flags=re.IGNORECASE)
+        addr = re.sub(r'[.\s]*(?:DO\s*HEREBY|MAKE\s*THE\s*FOLLOWING|DATE|PAN|REGISTRATION|PLACE|TIME|NAME|GSTIN|FORM).*$', '', addr, flags=re.IGNORECASE)
+        
+        # Remove multiple spaces and final cleanup
         addr = re.sub(r'\s+', ' ', addr)
-        result["fields"]["address"] = addr
+        result["fields"]["address"] = addr.strip(". ,(")
     else:
         # Fallback to multi-line search if keyword search failed
         _extract_aadhaar_address(text_lines, result)
