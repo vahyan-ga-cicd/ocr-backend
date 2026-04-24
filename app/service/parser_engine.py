@@ -74,8 +74,10 @@ def _detect_document_type(full_text: str) -> str:
         return "Cancelled Check"
 
     # 2. GST / TDS detection
-    if any(k in full_text for k in ["GOODS AND SERVICES TAX", "GSTIN", "FORM GST"]): return "GST Document"
-    if any(k in full_text for k in ["TAX DEDUCTED AT SOURCE", "TDS", "NON-DEDUCTION", "DECLARATION", "194C"]): return "TDS/SD Document"
+    if any(k in full_text for k in ["GOODS AND SERVICES TAX", "GSTIN", "FORM GST", "TAXABLE PERSON"]): 
+        return "GST Document"
+    if any(k in full_text for k in ["TAX DEDUCTED AT SOURCE", "TDS", "NON-DEDUCTION", "DECLARATION", "SECTION 194C", "DEDUCTOR", "TAN", "CHALLAN", "QUARTER", "197(1)"]): 
+        return "TDS/SD Document"
 
     # 3. RC detection with fuzzy matching support
     if any(k in full_text for k in ["REGISTRATION CERTIFICATE", "REGN.NUMBER", "OWNER NAME", "CHASSIS"]):
@@ -102,14 +104,31 @@ def _extract_pan_details(text_lines: list[str], result: dict):
     full_text = " ".join(text_lines).upper()
     match = re.search(r'([A-Z]{5}[0-9]{4}[A-Z]{1})', full_text)
     if match: result["fields"]["pan_number"] = match.group(1)
+    
+    # Name extraction for PAN (Usually line 2 or 3, before Father's name)
+    for i, line in enumerate(text_lines):
+        if i < 4:
+            if any(k in line.upper() for k in ["INCOME", "DEPARTMENT", "GOVT", "INDIA", "CARD"]): continue
+            if re.search(r'^[A-Z\s\.]+$', line.upper()) and len(line) > 3:
+                result["fields"]["name"] = line.strip()
+                break
 
 def _extract_aadhaar_details(text_lines: list[str], result: dict):
     full_text = " ".join(text_lines).upper()
-    # Flexible 12-digit detection (supports spaces, hyphens, or no separators)
+    # Flexible 12-digit detection
     match = re.search(r'\b(\d{4}[\s-]?\d{4}[\s-]?\d{4})\b|\b(\d{12})\b', full_text)
     if match:
         num = (match.group(1) or match.group(2)).replace(" ", "").replace("-", "")
         result["fields"]["aadhar_number"] = num
+    
+    # Name extraction for Aadhaar Front
+    for i, line in enumerate(text_lines):
+        if i < 5:
+            if any(k in line.upper() for k in ["GOVERNMENT", "INDIA", "MALE", "FEMALE", "DOB", "YEAR", "PUNJAB", "UNIQUE"]): continue
+            if re.search(r'^[A-Z\s\.]+$', line.upper()) and len(line) > 3:
+                result["fields"]["name"] = line.strip()
+                break
+
     # Address
     _extract_aadhaar_address(text_lines, result)
 
@@ -196,29 +215,68 @@ def _extract_bank_details(text_lines: list[str], result: dict):
             else: result["fields"]["bank_name"] = b
             break
 
-    # 3. Account Number: prioritize patterns near keywords
-    # Handle "A/c No", "Account No", "A/C:", etc.
+    # 3. Account Number: Advanced multi-line fuzzy matching
+    # Priority 1: Labels that are definitely the main Account Number box (Exclude CURRENT/SAVINGS here)
     acc_patterns = [
-        r'(?:A/C|ACCOUNT|ACC|SB)\s*(?:NO|NUMBER)?[:\s/]*(\d{9,18})',
-        r'(\d{9,18})\s*(?:A/C|ACCOUNT|ACC|SB)',
+        r'(?<!CURRENT\s)(?<!SAVINGS\s)(?:A[\/\.\s]?C|ACCOUNT|ACC|SB|खा[\.\s]*सं|A1C|ALC)[\s\.\:\/\-\|]*([\d\s\-]{9,22})',
+        r'([\d\s\-]{9,22})[\s\.\:\/\-\|]*(?<!CURRENT\s)(?<!SAVINGS\s)(?:A[\/\.\s]?C|ACCOUNT|ACC|SB|खा[\.\s]*सं|A1C|ALC)'
     ]
+    
+    best_match = None
     for pattern in acc_patterns:
-        acc_match = re.search(pattern, raw_full)
+        # Using a case-insensitive search but excluding CURRENT/SAVINGS
+        acc_match = re.search(pattern, raw_full, re.IGNORECASE)
         if acc_match:
-            result["fields"]["account_number"] = acc_match.group(1)
-            break
+            val = re.sub(r'[\s\-]', '', acc_match.group(1))
+            if 9 <= len(val) <= 18:
+                best_match = val
+                break
+
+    # Priority 2: Look for 11-digit numbers starting with 3 or 4 (SBI) near ANY relevant keyword
+    if not best_match:
+        potentials = re.findall(r'[\d\s\-]{9,22}', raw_full)
+        for p in potentials:
+            clean_p = re.sub(r'[\s\-]', '', p)
+            if len(clean_p) == 11 and clean_p.startswith(("3", "4")):
+                pos = raw_full.find(p)
+                surrounding = raw_full[max(0, pos-80):min(len(raw_full), pos+len(p)+80)]
+                if any(k in surrounding for k in ["A/C", "ACC", "ACCOUNT", "खा", "CURRENT", "SAVING"]):
+                    best_match = clean_p
+                    break
+    
+    # Priority 3: Last resort - CURRENT/SAVINGS labels
+    if not best_match:
+        last_resort = re.search(r'(?:CURRENT|SAVINGS)[\s\.\/]*(?:A/C|ACCOUNT)?[\s\.\:\/\-\|]*([\d\s\-]{9,22})', raw_full)
+        if last_resort:
+            val = re.sub(r'[\s\-]', '', last_resort.group(1))
+            if 9 <= len(val) <= 18: best_match = val
+
+    # If no label match, look for any 11-digit number near an A/C label
+    if not best_match:
+        # Find all 9-18 digit sequences
+        potentials = re.findall(r'\b[\d\s\-]{9,22}\b', raw_full)
+        for p in potentials:
+            clean_p = re.sub(r'[\s\-]', '', p)
+            if 9 <= len(clean_p) <= 18:
+                # Check if "A/C" or "ACCOUNT" or "खा. सं." is within 50 characters of this number
+                pos = raw_full.find(p)
+                surrounding = raw_full[max(0, pos-60):min(len(raw_full), pos+len(p)+60)]
+                if any(k in surrounding for k in ["A/C", "ACC", "ACCOUNT", "खा. सं.", "खा.सं."]):
+                    # Special priority for numbers starting with 3 or 4 (SBI common)
+                    if clean_p.startswith(("3", "4")):
+                        best_match = clean_p
+                        break
+                    if not best_match: best_match = clean_p
+
+    if best_match:
+        result["fields"]["account_number"] = best_match
             
     if not result["fields"]["account_number"]:
-        # Fallback: look for 9-18 digit strings that aren't phone numbers, ifsc, or micr-like (bottom of cheque)
-        # Phone numbers usually start with 6-9 and are 10 digits
+        # Fallback: look for 9-18 digit strings...
         potential = re.findall(r'\b\d{9,18}\b', raw_full)
         for p in potential:
-            # Basic heuristic: avoid likely phone numbers and short sequences
-            if len(p) == 10 and p.startswith(("6", "7", "8", "9")):
-                continue
-            # Avoid likely IFSC (already captured) or other known patterns
-            if p == result["fields"]["ifsc_code"]:
-                continue
+            if len(p) == 10 and p.startswith(("6", "7", "8", "9")): continue
+            if p == result["fields"]["ifsc_code"]: continue
             result["fields"]["account_number"] = p
             break
 
@@ -227,19 +285,18 @@ def _extract_tax_doc_details(text_lines: list[str], result: dict):
     
     # Try more comprehensive patterns for GST/TDS addresses
     # Pattern 1: Look for "Address of Principal Place of Business" or similar
-    gst_addr_pattern = r'(?:ADDRESS\s*OF\s*PRINCIPAL\s*PLACE(?:\s*OF\s*BUSINESS)?|PRINCIPAL\s*PLACE\s*OF\s*BUSINESS|REGISTERED\s*OFFICE\s*ADDRESS|ADDRESS\s*OF\s*THE\s*PERSON|ADDRESS\s*OF\s*THE\s*DEDUCTOR|DEDUCTOR\s*ADDRESS)[:\s]*\s*([^\n\r]{10,400}?(?:\d{6}|PIN|INDIA|TAMIL|TN|KERALA|KARNATAKA|MAHARASHTRA|DELHI|NAMAKKAL)[^\n\r]{0,20})'
+    gst_addr_pattern = r'(?:ADDRESS\s*OF\s*PRINCIPAL\s*PLACE(?:\s*OF\s*BUSINESS)?|PRINCIPAL\s*PLACE\s*OF\s*BUSINESS|REGISTERED\s*OFFICE\s*ADDRESS|ADDRESS\s*OF\s*THE\s*PERSON|ADDRESS\s*OF\s*THE\s*DEDUCTOR|DEDUCTOR\s*ADDRESS|PREMISES|LOCATED\s*AT)[:\s]*\s*([^\n\r]{10,450}?(?:\d{6}|PIN|INDIA|TAMIL|TN|KERALA|KARNATAKA|MAHARASHTRA|DELHI|NAMAKKAL|MUMBAI|CHENNAI|BANGALORE)[^\n\r]{0,30})'
     match = re.search(gst_addr_pattern, full_doc, re.IGNORECASE)
     
     if not match:
         # Pattern 2: Generic "Address" or "N/O" or "LOCATED AT" (Removed [^.] constraint to allow periods in names/titles)
-        match = re.search(r'(?:N/O|ADDRESS|LOCATED\s*AT)[:\s]*\s*([^\n\r]{10,400}?(?:\d{6}|PIN|INDIA|TAMIL|TN|NAMAKKAL)[^\n\r]{0,20})', full_doc, re.IGNORECASE)
+        match = re.search(r'(?:N/O|ADDRESS|LOCATED\s*AT|OFFICE)[:\s]*\s*([^\n\r]{10,450}?(?:\d{6}|PIN|INDIA|TAMIL|TN|NAMAKKAL|MUMBAI|CHENNAI|BANGALORE)[^\n\r]{0,30})', full_doc, re.IGNORECASE)
 
     if match:
         addr = match.group(1).strip()
         # Filter out common junk at start of address
-        addr = re.sub(r'^[I,]\s*[^,]+,\s*[SWDC]/O\s*[^,]+,\s*', '', addr, flags=re.IGNORECASE)
+        addr = re.sub(r'^(?:BHARAT\s*STAGE|STAGE|CLASS\s*OF\s*VEHICLE|EMISSION|OWNER|I,)\s*[^,]*[,\s]*', '', addr, flags=re.IGNORECASE)
         # Remove trailing noise like "Date of issue" or "PAN of..." or legal jargon
-        # Using a more aggressive pattern that catches text joined by periods or brackets
         addr = re.sub(r'[.\s]*\(?HERE\s*IN\s*AFT.*$', '', addr, flags=re.IGNORECASE)
         addr = re.sub(r'[.\s]*(?:DO\s*HEREBY|MAKE\s*THE\s*FOLLOWING|DATE|PAN|REGISTRATION|PLACE|TIME|NAME|GSTIN|FORM).*$', '', addr, flags=re.IGNORECASE)
         
