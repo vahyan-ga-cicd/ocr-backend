@@ -20,7 +20,9 @@ def get_ocr_engine():
                     use_gpu=False,
                     det_model_dir='/tmp/.paddleocr/det',
                     rec_model_dir='/tmp/.paddleocr/rec',
-                    cls_model_dir='/tmp/.paddleocr/cls'
+                    cls_model_dir='/tmp/.paddleocr/cls',
+                    det_limit_side_len=1500,
+                    det_limit_type='max'
                 )
     return _ocr_engine
 
@@ -34,7 +36,7 @@ def extract_text_from_memory_image(img_array: np.ndarray) -> list[str]:
         logging.info(f"Original image shape: {h}x{w}")
 
         # Optimization: Resize extremely large images to a max dimension while maintaining aspect ratio
-        MAX_DIM = 2000
+        MAX_DIM = 1500
         if max(h, w) > MAX_DIM:
             scale = MAX_DIM / max(h, w)
             new_w, new_h = int(w * scale), int(h * scale)
