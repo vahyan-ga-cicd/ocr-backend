@@ -17,10 +17,7 @@ provider:
 
 functions:
   api:
-    image:
-      command:
-        - app.main.handler
-      name: appimage
+    image: appimage
     timeout: 300
     events:
       - httpApi: '*'
